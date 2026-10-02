@@ -142,7 +142,7 @@ class RutaViewModel(
     fun saveRiskPoint() {
         val description = _descriptionInput.value.trim()
         if (description.isBlank()) {
-            _formErrorMessage.value = "Por favor escribe una descripción corta de la ubicación"
+            _formErrorMessage.value = "Por favor escribí la ubicación del peligro para avisar a tus compañeros"
             return
         }
 
@@ -159,39 +159,37 @@ class RutaViewModel(
                 _descriptionInput.value = ""
                 _formErrorMessage.value = null
                 _isFormVisible.value = false
-                _userFeedback.emit("¡Punto de riesgo guardado en la memoria del teléfono!")
+                _userFeedback.emit("¡Aviso guardado! Ya se muestra en la lista para tus compañeros.")
             } catch (e: Exception) {
-                _formErrorMessage.value = "Error al guardar el punto: ${e.localizedMessage}"
+                _formErrorMessage.value = "No se pudo guardar el aviso. Por favor intentá de nuevo."
             }
         }
     }
 
     /**
      * OPERACIÓN: BORRAR INDIVIDUAL
-     * Elimina un reporte específico por su ID.
      */
     fun deletePoint(id: Long) {
         viewModelScope.launch {
             try {
                 repository.deletePointById(id)
-                _userFeedback.emit("Reporte eliminado de la base de datos local")
+                _userFeedback.emit("Aviso eliminado de la lista.")
             } catch (e: Exception) {
-                _userFeedback.emit("No se pudo eliminar el reporte")
+                _userFeedback.emit("No se pudo quitar el aviso. Intentá de nuevo.")
             }
         }
     }
 
     /**
      * OPERACIÓN: BORRAR TODO
-     * Vacía completamente la tabla local.
      */
     fun clearAllPoints() {
         viewModelScope.launch {
             try {
                 repository.deleteAllPoints()
-                _userFeedback.emit("Se han borrado todos los reportes locales")
+                _userFeedback.emit("Se borraron todos los avisos de la lista.")
             } catch (e: Exception) {
-                _userFeedback.emit("Error al vaciar los datos: ${e.localizedMessage}")
+                _userFeedback.emit("No pudimos borrar los avisos. Intentá de nuevo.")
             }
         }
     }
@@ -204,9 +202,9 @@ class RutaViewModel(
             try {
                 repository.deleteAllPoints()
                 repository.seedDefaultIfEmpty()
-                _userFeedback.emit("Dato de ejemplo cargado exitosamente")
+                _userFeedback.emit("Aviso de ejemplo cargado para que pruebes la app.")
             } catch (e: Exception) {
-                _userFeedback.emit("Error al cargar dato de ejemplo")
+                _userFeedback.emit("No se pudo cargar el ejemplo.")
             }
         }
     }
@@ -259,13 +257,13 @@ class RutaViewModel(
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
 
-                val chooser = Intent.createChooser(shareIntent, "Exportar / Guardar archivo de respaldo").apply {
+                val chooser = Intent.createChooser(shareIntent, "Guardar o enviar archivo de respaldo").apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
                 context.startActivity(chooser)
-                _userFeedback.emit("Archivo de respaldo generado: $fileName")
+                _userFeedback.emit("Archivo de respaldo preparado para compartir o guardar.")
             } catch (e: Exception) {
-                _userFeedback.emit("Error al exportar archivo: ${e.localizedMessage}")
+                _userFeedback.emit("No se pudo crear el archivo de respaldo. Por favor intentá de nuevo.")
             }
         }
     }

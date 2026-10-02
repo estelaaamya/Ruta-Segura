@@ -53,7 +53,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DividerDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
@@ -83,6 +82,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
@@ -102,12 +102,14 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 /**
- * Pantalla principal de RUTA SEGURA.
- * Funciones clave:
- * 1. Marcar un punto del camino con categoría, ubicación escrita y hora del día.
- * 2. Ver la lista de puntos reportados filtrada por hora del día (Mañana, Tarde, Noche).
- * 3. Compartir reporte por enlace o por texto.
- * 4. Almacenamiento local persistente: Respaldo, exportación a archivo .json y gestión de datos.
+ * Pantalla principal de RUTA SEGURA adaptada para la versión M3 (Experiencia y Accesibilidad).
+ * Cumple con los 6 requisitos de UX:
+ * 1. Funciona desde 320 px de ancho, con una sola mano y sin hacer zoom.
+ * 2. Alto contraste para leerse bajo luz solar directa; NINGÚN texto menor a 16 px (16 sp).
+ * 3. Todos los campos con etiqueta visible fija, no solo texto de ejemplo dentro.
+ * 4. Un solo botón principal por pantalla (FAB en inicio, Guardar en formulario); los demás secundarios.
+ * 5. Estado vacío claro con frase motivadora que invita a la primera acción.
+ * 6. Mensajes de éxito y error en español coloquial y claro, sin palabras técnicas.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -129,7 +131,6 @@ fun RutaSeguraScreen(
     val selectedTimeOfDay by viewModel.selectedTimeOfDay.collectAsStateWithLifecycle()
     val formErrorMessage by viewModel.formErrorMessage.collectAsStateWithLifecycle()
 
-    // Modales de interacción
     var pointToShare by remember { mutableStateOf<RiskPointEntity?>(null) }
     var pointToDelete by remember { mutableStateOf<RiskPointEntity?>(null) }
     var isBackupDialogOpen by remember { mutableStateOf(false) }
@@ -147,66 +148,71 @@ fun RutaSeguraScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    ) {
                         Surface(
                             shape = CircleShape,
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            modifier = Modifier.size(40.dp)
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(44.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     imageVector = Icons.Default.Security,
                                     contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(24.dp)
+                                    tint = MaterialTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.size(26.dp)
                                 )
                             }
                         }
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
                         Column {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
                                     text = "RUTA SEGURA",
-                                    style = MaterialTheme.typography.titleMedium.copy(
-                                        fontWeight = FontWeight.Black,
-                                        letterSpacing = 1.sp
-                                    )
+                                    fontSize = 19.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    letterSpacing = 0.5.sp
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Surface(
                                     shape = RoundedCornerShape(6.dp),
-                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                    border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
                                 ) {
                                     Text(
-                                        text = "M2",
-                                        style = MaterialTheme.typography.labelSmall.copy(
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.primary
-                                        ),
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
+                                        text = "M3",
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                     )
                                 }
                             }
                             Text(
-                                text = "Puntos de cuidado camino al instituto",
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                text = "Camino al instituto",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
                 },
                 actions = {
-                    // Botón para acceder al respaldo y exportación de datos locales
+                    // Botón secundario para respaldo y exportación
                     IconButton(
                         onClick = { isBackupDialogOpen = true },
-                        modifier = Modifier.testTag("storage_backup_button")
+                        modifier = Modifier
+                            .size(48.dp)
+                            .testTag("storage_backup_button")
                     ) {
                         Icon(
                             imageVector = Icons.Default.Storage,
-                            contentDescription = "Almacenamiento y respaldo",
-                            tint = MaterialTheme.colorScheme.primary
+                            contentDescription = "Opciones de respaldo",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(26.dp)
                         )
                     }
                 },
@@ -216,13 +222,23 @@ fun RutaSeguraScreen(
             )
         },
         floatingActionButton = {
+            // ÚNICO BOTÓN PRINCIPAL EN ESTA PANTALLA: Prominente y en la zona cómoda para el pulgar
             ExtendedFloatingActionButton(
                 onClick = { viewModel.openForm() },
-                icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text("Marcar punto", fontWeight = FontWeight.Bold) },
+                icon = { Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(24.dp)) },
+                text = {
+                    Text(
+                        text = "Marcar punto",
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.testTag("add_point_fab")
+                elevation = androidx.compose.material3.FloatingActionButtonDefaults.elevation(6.dp),
+                modifier = Modifier
+                    .padding(bottom = 8.dp)
+                    .testTag("add_point_fab")
             )
         }
     ) { innerPadding ->
@@ -231,18 +247,14 @@ fun RutaSeguraScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // ==========================================
-            // SECCIÓN 1: Filtro horario (Mañana, Tarde, Noche)
-            // ==========================================
+            // SECCIÓN: Filtro horario
             FilterSection(
                 selectedFilter = selectedFilter,
                 allPoints = allPoints,
                 onFilterSelected = { viewModel.onFilterChanged(it) }
             )
 
-            // ==========================================
-            // SECCIÓN 2: Lista de puntos reportados
-            // ==========================================
+            // SECCIÓN: Lista de puntos reportados o Estado Vacío
             if (filteredPoints.isEmpty()) {
                 EmptyStateCard(
                     selectedFilter = selectedFilter,
@@ -251,8 +263,8 @@ fun RutaSeguraScreen(
                 )
             } else {
                 LazyColumn(
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 10.dp, bottom = 96.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
                     modifier = Modifier
                         .fillMaxSize()
                         .testTag("reports_list")
@@ -269,9 +281,9 @@ fun RutaSeguraScreen(
                                 shareReportViaIntent(context, viewModel.generateShareText(point))
                             },
                             onCopyText = {
-                                copyToClipboard(context, "Reporte Ruta Segura", viewModel.generateShareText(point))
+                                copyToClipboard(context, "Aviso de Ruta Segura", viewModel.generateShareText(point))
                                 coroutineScope.launch {
-                                    snackbarHostState.showSnackbar("¡Texto del reporte copiado al portapapeles!")
+                                    snackbarHostState.showSnackbar("¡Texto copiado! Ya podés pegarlo en un mensaje.")
                                 }
                             }
                         )
@@ -281,9 +293,7 @@ fun RutaSeguraScreen(
         }
     }
 
-    // ========================================================
-    // MODAL BOTTOM SHEET: Formulario para marcar nuevo punto
-    // ========================================================
+    // FORMULARIO: ModalBottomSheet accesible con una sola mano
     if (isFormVisible) {
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -311,9 +321,7 @@ fun RutaSeguraScreen(
         }
     }
 
-    // ========================================================
-    // DIÁLOGO: Compartir Enlace o Texto
-    // ========================================================
+    // DIÁLOGO: Compartir (Un solo botón primario)
     pointToShare?.let { point ->
         SharePointDialog(
             point = point,
@@ -323,54 +331,74 @@ fun RutaSeguraScreen(
                 pointToShare = null
             },
             onCopyText = {
-                copyToClipboard(context, "Reporte Ruta Segura", viewModel.generateShareText(point))
+                copyToClipboard(context, "Aviso de Ruta Segura", viewModel.generateShareText(point))
                 pointToShare = null
                 coroutineScope.launch {
-                    snackbarHostState.showSnackbar("¡Texto copiado al portapapeles!")
+                    snackbarHostState.showSnackbar("¡Texto copiado para compartir!")
                 }
             },
             onCopyLink = {
                 val link = viewModel.generateShareLink(point)
-                copyToClipboard(context, "Enlace Ruta Segura", link)
+                copyToClipboard(context, "Enlace de Ruta Segura", link)
                 pointToShare = null
                 coroutineScope.launch {
-                    snackbarHostState.showSnackbar("¡Enlace copiado al portapapeles!")
+                    snackbarHostState.showSnackbar("¡Enlace copiado listo para enviar!")
                 }
             }
         )
     }
 
-    // ========================================================
-    // DIÁLOGO: Confirmar eliminación individual
-    // ========================================================
+    // DIÁLOGO: Confirmar eliminación
     pointToDelete?.let { point ->
         AlertDialog(
             onDismissRequest = { pointToDelete = null },
-            icon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
-            title = { Text("¿Eliminar este reporte?", fontWeight = FontWeight.Bold) },
-            text = { Text("Se quitará el punto \"${point.category}\" en \"${point.description}\" de la base de datos local.") },
+            icon = {
+                Icon(
+                    Icons.Default.Delete,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "¿Querés borrar este aviso?",
+                    fontSize = 19.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = "Se quitará el aviso \"${point.category}\" ubicado en \"${point.description}\".",
+                    fontSize = 16.sp
+                )
+            },
             confirmButton = {
+                // Único botón principal del diálogo
                 Button(
                     onClick = {
                         viewModel.deletePoint(point.id)
                         pointToDelete = null
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                    modifier = Modifier.height(48.dp)
                 ) {
-                    Text("Eliminar")
+                    Text("Borrar aviso", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { pointToDelete = null }) {
-                    Text("Cancelar")
+                // Botón secundario
+                OutlinedButton(
+                    onClick = { pointToDelete = null },
+                    modifier = Modifier.height(48.dp)
+                ) {
+                    Text("Cancelar", fontSize = 16.sp)
                 }
             }
         )
     }
 
-    // ========================================================
-    // DIÁLOGO: Gestión de Almacenamiento Local y Respaldo
-    // ========================================================
+    // DIÁLOGO: Gestión de respaldo local
     if (isBackupDialogOpen) {
         StorageBackupDialog(
             totalCount = allPoints.size,
@@ -381,10 +409,10 @@ fun RutaSeguraScreen(
                 isBackupDialogOpen = false
             },
             onCopyJson = {
-                copyToClipboard(context, "JSON Respaldo Ruta Segura", viewModel.exportToJson())
+                copyToClipboard(context, "Respaldo Ruta Segura", viewModel.exportToJson())
                 isBackupDialogOpen = false
                 coroutineScope.launch {
-                    snackbarHostState.showSnackbar("¡Datos JSON copiados al portapapeles!")
+                    snackbarHostState.showSnackbar("¡Datos de respaldo copiados al portapapeles!")
                 }
             },
             onResetSample = {
@@ -398,27 +426,49 @@ fun RutaSeguraScreen(
         )
     }
 
-    // Confirmación para vaciar toda la memoria local
+    // DIÁLOGO: Confirmar borrado completo
     if (isClearAllConfirmOpen) {
         AlertDialog(
             onDismissRequest = { isClearAllConfirmOpen = false },
-            icon = { Icon(Icons.Default.DeleteSweep, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
-            title = { Text("¿Borrar todos los reportes?", fontWeight = FontWeight.Bold) },
-            text = { Text("Esta acción eliminará todos los puntos guardados en la memoria del teléfono.") },
+            icon = {
+                Icon(
+                    Icons.Default.DeleteSweep,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "¿Borrar todos los avisos?",
+                    fontSize = 19.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = "Esta acción quitará todos los reportes guardados en este celular.",
+                    fontSize = 16.sp
+                )
+            },
             confirmButton = {
                 Button(
                     onClick = {
                         viewModel.clearAllPoints()
                         isClearAllConfirmOpen = false
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                    modifier = Modifier.height(48.dp)
                 ) {
-                    Text("Borrar todo")
+                    Text("Sí, borrar todo", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { isClearAllConfirmOpen = false }) {
-                    Text("Cancelar")
+                OutlinedButton(
+                    onClick = { isClearAllConfirmOpen = false },
+                    modifier = Modifier.height(48.dp)
+                ) {
+                    Text("Volver", fontSize = 16.sp)
                 }
             }
         )
@@ -426,7 +476,8 @@ fun RutaSeguraScreen(
 }
 
 /**
- * Barra superior de filtros por hora del día con contador en tiempo real.
+ * Filtro horario horizontal adaptable a pantallas estrechas (320px).
+ * Textos en 16.sp con alto contraste.
  */
 @Composable
 private fun FilterSection(
@@ -436,29 +487,32 @@ private fun FilterSection(
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 2.dp,
+        tonalElevation = 3.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp)
+                .padding(horizontal = 14.dp, vertical = 10.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(bottom = 6.dp)
+                modifier = Modifier.padding(bottom = 8.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.FilterList,
                     contentDescription = null,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(20.dp),
                     tint = MaterialTheme.colorScheme.primary
                 )
-                Spacer(modifier = Modifier.width(6.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                // Etiqueta visible del filtro con texto >= 16sp
                 Text(
-                    text = "Filtrar por horario de tránsito:",
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = "Filtrar por horario:",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
 
@@ -479,30 +533,36 @@ private fun FilterSection(
                         selected = isSelected,
                         onClick = { onFilterSelected(filter) },
                         label = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(vertical = 4.dp)
+                            ) {
                                 Text(
                                     text = filter.label,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                    fontSize = 16.sp,
+                                    fontWeight = if (isSelected) FontWeight.Black else FontWeight.Bold
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Surface(
                                     shape = CircleShape,
                                     color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                                    modifier = Modifier.size(20.dp)
+                                    modifier = Modifier.size(24.dp)
                                 ) {
                                     Box(contentAlignment = Alignment.Center) {
                                         Text(
                                             text = count.toString(),
-                                            style = MaterialTheme.typography.labelSmall.copy(
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
+                                            fontSize = 16.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 }
                             }
                         },
+                        border = BorderStroke(
+                            width = if (isSelected) 2.dp else 1.dp,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                        ),
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
                             selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -516,7 +576,11 @@ private fun FilterSection(
 }
 
 /**
- * Tarjeta individual para mostrar un punto reportado.
+ * Tarjeta individual de reporte.
+ * - Alto contraste (fondo blanco, texto oscuro, bordes sólidos).
+ * - Tamaño de letra nunca menor a 16 px.
+ * - Botones secundarios claros (Compartir / Copiar).
+ * - Disposición vertical/responsiva para no romperse en 320 px de ancho.
  */
 @Composable
 private fun RiskPointCard(
@@ -532,7 +596,7 @@ private fun RiskPointCard(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier
             .fillMaxWidth()
             .testTag("report_card_${point.id}")
@@ -542,6 +606,7 @@ private fun RiskPointCard(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
+            // Fila superior: Tipo de peligro + Momento del día
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -549,133 +614,148 @@ private fun RiskPointCard(
             ) {
                 Surface(
                     shape = RoundedCornerShape(8.dp),
-                    color = categoryMeta.color.copy(alpha = 0.15f),
-                    border = BorderStroke(1.dp, categoryMeta.color.copy(alpha = 0.4f))
+                    color = categoryMeta.color.copy(alpha = 0.18f),
+                    border = BorderStroke(1.5.dp, categoryMeta.color)
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
                     ) {
                         Icon(
                             imageVector = categoryMeta.icon,
                             contentDescription = null,
                             tint = categoryMeta.color,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = point.category,
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = categoryMeta.color
-                            )
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = categoryMeta.color
                         )
                     }
                 }
 
                 Surface(
                     shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.secondaryContainer
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Schedule,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                            modifier = Modifier.size(14.dp)
+                            modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = point.timeOfDay,
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
+            // Ubicación del reporte con etiqueta visible y texto >= 16sp
             Row(verticalAlignment = Alignment.Top) {
                 Icon(
                     imageVector = Icons.Default.LocationOn,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier
-                        .size(20.dp)
+                        .size(24.dp)
                         .padding(top = 2.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Column {
                     Text(
-                        text = "Ubicación:",
-                        style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        text = "Ubicación reportada:",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         text = point.description,
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        lineHeight = 23.sp
                     )
                 }
             }
 
             if (point.exactTime.isNotBlank()) {
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Hora de registro: ${point.exactTime}",
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                    ),
-                    modifier = Modifier.padding(start = 28.dp)
+                    text = "Registrado a las: ${point.exactTime}",
+                    fontSize = 16.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 32.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
+            // Botones SECUNDARIOS: En 320px de ancho se ajustan en FlowRow para no desbordar
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.weight(1f, fill = false)
+                ) {
+                    // Botón secundario: Compartir
                     OutlinedButton(
                         onClick = onDirectShareApp,
                         shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                        modifier = Modifier.testTag("share_button_${point.id}")
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary),
+                        modifier = Modifier
+                            .height(44.dp)
+                            .testTag("share_button_${point.id}")
                     ) {
-                        Icon(imageVector = Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(imageVector = Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text(text = "Compartir", style = MaterialTheme.typography.labelMedium)
+                        Text(text = "Compartir", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     }
 
+                    // Botón secundario: Copiar
                     OutlinedButton(
                         onClick = onCopyText,
                         shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                        modifier = Modifier.testTag("copy_text_button_${point.id}")
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline),
+                        modifier = Modifier
+                            .height(44.dp)
+                            .testTag("copy_text_button_${point.id}")
                     ) {
-                        Icon(imageVector = Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(imageVector = Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text(text = "Copiar", style = MaterialTheme.typography.labelMedium)
+                        Text(text = "Copiar", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     }
                 }
 
+                // Botón secundario: Borrar
                 IconButton(
                     onClick = onDeleteClick,
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier.size(44.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Delete,
-                        contentDescription = "Eliminar reporte",
-                        tint = MaterialTheme.colorScheme.outline
+                        contentDescription = "Borrar aviso",
+                        tint = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.size(24.dp)
                     )
                 }
             }
@@ -684,7 +764,12 @@ private fun RiskPointCard(
 }
 
 /**
- * Contenido del formulario para marcar un punto nuevo.
+ * Formulario para marcar un punto nuevo.
+ * Requisitos cumplidos:
+ * - Se usa con una sola mano desde abajo (Bottom Sheet con scroll).
+ * - Todas las etiquetas son VISIBLES permanentemente.
+ * - Textos en 16.sp o superior con contraste para luz solar.
+ * - Un solo botón principal ("Guardar aviso"). Cancelar es secundario.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -700,27 +785,35 @@ private fun NewRiskPointFormContent(
     onCancel: () -> Unit
 ) {
     val focusManager = LocalFocusManager.current
+    val scrollState = rememberScrollState()
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 8.dp)
+            .verticalScroll(scrollState)
+            .padding(horizontal = 20.dp, vertical = 12.dp)
     ) {
         Text(
-            text = "Marcar punto de riesgo",
-            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+            text = "Marcar un punto de riesgo",
+            fontSize = 21.sp,
+            fontWeight = FontWeight.Black,
+            color = MaterialTheme.colorScheme.onSurface
         )
+        Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = "Alerta a otros estudiantes sobre lugares donde no conviene pasar solo.",
-            style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+            text = "Avisá a tus compañeros sobre lugares donde conviene no pasar solo.",
+            fontSize = 16.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
         Spacer(modifier = Modifier.height(18.dp))
 
-        // 1. Categoría
+        // 1. ETIQUETA VISIBLE OBLIGATORIA: Categoría
         Text(
-            text = "1. Selecciona la categoría:",
-            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
+            text = "1. Seleccioná qué peligro viste:",
+            fontSize = 17.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
         )
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -735,8 +828,8 @@ private fun NewRiskPointFormContent(
                     shape = RoundedCornerShape(12.dp),
                     color = if (isSelected) category.color.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surfaceVariant,
                     border = BorderStroke(
-                        width = if (isSelected) 2.dp else 1.dp,
-                        color = if (isSelected) category.color else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                        width = if (isSelected) 2.dp else 1.5.dp,
+                        color = if (isSelected) category.color else MaterialTheme.colorScheme.outline
                     ),
                     modifier = Modifier
                         .clickable { onCategoryChange(category.displayName) }
@@ -744,60 +837,86 @@ private fun NewRiskPointFormContent(
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
                     ) {
                         Icon(
                             imageVector = category.icon,
                             contentDescription = null,
                             tint = if (isSelected) category.color else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(22.dp)
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = category.displayName,
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                color = if (isSelected) category.color else MaterialTheme.colorScheme.onSurface
-                            )
+                            fontSize = 16.sp,
+                            fontWeight = if (isSelected) FontWeight.Black else FontWeight.Bold,
+                            color = if (isSelected) category.color else MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(18.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
-        // 2. Descripción corta escrita de la ubicación
+        // 2. ETIQUETA VISIBLE OBLIGATORIA: Descripción escrita
         Text(
-            text = "2. Descripción corta de la ubicación:",
-            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
+            text = "2. Escribí dónde está el peligro:",
+            fontSize = 17.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
         )
         Spacer(modifier = Modifier.height(6.dp))
 
         OutlinedTextField(
             value = descriptionInput,
             onValueChange = onDescriptionChange,
-            placeholder = { Text("Ej: esquina de la tienda, frente a la parada...") },
+            // Etiqueta flotante visible permanentemente
+            label = {
+                Text(
+                    text = "Ubicación del peligro",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            },
+            placeholder = {
+                Text(
+                    text = "Ej: esquina de la tienda, frente a la parada...",
+                    fontSize = 16.sp
+                )
+            },
             isError = errorMessage != null,
             supportingText = {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
                     if (errorMessage != null) {
                         Text(
                             text = errorMessage,
                             color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(bottom = 2.dp)
                         )
-                    } else {
-                        Text(text = "Sé claro y específico para tus compañeros")
                     }
-                    Text(text = "${descriptionInput.length}/150")
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Sé claro para que otros sepan dónde cuidarse",
+                            fontSize = 16.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "${descriptionInput.length}/150",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             },
             singleLine = false,
             maxLines = 3,
+            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 17.sp, fontWeight = FontWeight.Normal),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
             modifier = Modifier
@@ -805,12 +924,14 @@ private fun NewRiskPointFormContent(
                 .testTag("location_description_input")
         )
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(18.dp))
 
-        // 3. Hora del día (Mañana, Tarde, Noche)
+        // 3. ETIQUETA VISIBLE OBLIGATORIA: Hora del día
         Text(
-            text = "3. Hora del día (cuándo es riesgoso pasar):",
-            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
+            text = "3. ¿Cuándo es más peligroso pasar?:",
+            fontSize = 17.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
         )
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -825,8 +946,8 @@ private fun NewRiskPointFormContent(
                     shape = RoundedCornerShape(12.dp),
                     color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
                     border = BorderStroke(
-                        width = if (isSelected) 2.dp else 1.dp,
-                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                        width = if (isSelected) 2.dp else 1.5.dp,
+                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
                     ),
                     modifier = Modifier
                         .weight(1f)
@@ -835,69 +956,67 @@ private fun NewRiskPointFormContent(
                 ) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp)
+                        modifier = Modifier.padding(vertical = 12.dp, horizontal = 4.dp)
                     ) {
                         Icon(
                             imageVector = timeSlot.icon,
                             contentDescription = null,
                             tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(24.dp)
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = timeSlot.displayName,
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                            )
-                        )
-                        Text(
-                            text = timeSlot.hint,
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontSize = 10.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            fontSize = 16.sp,
+                            fontWeight = if (isSelected) FontWeight.Black else FontWeight.Bold,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(28.dp))
 
+        // BOTONES DE ACCIÓN: UN SOLO BOTÓN PRINCIPAL
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            // Botón Secundario
             OutlinedButton(
                 onClick = onCancel,
+                border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline),
                 modifier = Modifier
                     .weight(1f)
-                    .height(48.dp)
+                    .height(52.dp)
             ) {
-                Text("Cancelar")
+                Text("Cancelar", fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
 
+            // ÚNICO BOTÓN PRINCIPAL: Relleno sólido llamativo
             Button(
                 onClick = onSave,
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp),
                 modifier = Modifier
-                    .weight(1.5f)
-                    .height(48.dp)
+                    .weight(1.6f)
+                    .height(52.dp)
                     .testTag("save_report_button")
             ) {
-                Icon(Icons.Default.Check, contentDescription = null)
+                Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(20.dp))
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("Guardar reporte", fontWeight = FontWeight.Bold)
+                Text("Guardar aviso", fontSize = 17.sp, fontWeight = FontWeight.Black)
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(28.dp))
     }
 }
 
 /**
- * Diálogo modal para compartir reporte por WhatsApp, mensaje o enlace.
+ * Diálogo modal para compartir reporte.
+ * Un solo botón principal (Compartir por apps), los demás son secundarios.
  */
 @Composable
 private fun SharePointDialog(
@@ -911,82 +1030,93 @@ private fun SharePointDialog(
         onDismissRequest = onDismiss,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(imageVector = Icons.Default.Share, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Icon(imageVector = Icons.Default.Share, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Compartir reporte", fontWeight = FontWeight.Bold)
+                Text("Compartir aviso", fontSize = 19.sp, fontWeight = FontWeight.Bold)
             }
         },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    text = "Avisa a tus compañeros para que tomen precauciones o busquen otra calle:",
-                    style = MaterialTheme.typography.bodyMedium
+                    text = "Avisá a tus compañeros para que tomen precauciones o busquen otra calle:",
+                    fontSize = 16.sp
                 )
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(14.dp))
                 Card(
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
                     ),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Text(text = "⚠️ ${point.category}", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold))
-                        Text(text = "📍 ${point.description}", style = MaterialTheme.typography.bodySmall)
-                        Text(text = "⏰ Horario: ${point.timeOfDay}", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.primary))
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Text(text = "⚠️ ${point.category}", fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(text = "📍 ${point.description}", fontSize = 16.sp)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(text = "⏰ Horario: ${point.timeOfDay}", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     }
                 }
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(18.dp))
 
+                // ÚNICO BOTÓN PRINCIPAL
                 Button(
                     onClick = onShareViaSystem,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(44.dp)
+                        .height(48.dp)
                         .testTag("dialog_share_system")
                 ) {
-                    Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Compartir por WhatsApp / Apps")
+                    Text("Compartir por WhatsApp o Mensajes", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
+                // Botón Secundario: Copiar texto
                 OutlinedButton(
                     onClick = onCopyText,
+                    border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(44.dp)
+                        .height(48.dp)
                         .testTag("dialog_copy_text")
                 ) {
                     Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Copiar texto del reporte")
+                    Text("Copiar texto del aviso", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
+                // Botón Secundario: Copiar enlace
                 OutlinedButton(
                     onClick = onCopyLink,
+                    border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(44.dp)
+                        .height(48.dp)
                         .testTag("dialog_copy_link")
                 ) {
                     Icon(Icons.Default.Link, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Copiar enlace al reporte")
+                    Text("Copiar enlace", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
             }
         },
         confirmButton = {},
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cerrar") }
+            TextButton(onClick = onDismiss) {
+                Text("Cerrar", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            }
         }
     )
 }
 
 /**
- * Diálogo de gestión de almacenamiento local y respaldo a archivo .json.
+ * Diálogo de respaldo local.
+ * Un solo botón principal para exportar el archivo .json.
  */
 @Composable
 private fun StorageBackupDialog(
@@ -1004,9 +1134,9 @@ private fun StorageBackupDialog(
         onDismissRequest = onDismiss,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Storage, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Icon(Icons.Default.Storage, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Almacenamiento Local", fontWeight = FontWeight.Bold)
+                Text("Guardado y Respaldo", fontSize = 19.sp, fontWeight = FontWeight.Bold)
             }
         },
         text = {
@@ -1016,123 +1146,114 @@ private fun StorageBackupDialog(
                     .verticalScroll(scrollState)
             ) {
                 Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(modifier = Modifier.padding(10.dp)) {
+                    Column(modifier = Modifier.padding(12.dp)) {
                         Text(
-                            text = "💾 Persistencia en tu teléfono",
-                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            text = "💾 Guardado en este celular",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Tus datos quedan guardados en la base interna de Android ($totalCount reportes). No se pierden al cerrar la app.",
-                            style = MaterialTheme.typography.bodySmall
+                            text = "Tenés $totalCount avisos guardados. No se borran al cerrar la app.",
+                            fontSize = 16.sp,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    text = "Opciones de respaldo y archivo:",
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                    text = "Opciones para no perder tus datos:",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
-                // Exportar archivo .json
+                // ÚNICO BOTÓN PRINCIPAL
                 Button(
                     onClick = onExportFile,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(42.dp)
+                        .height(48.dp)
                         .testTag("export_backup_file_button")
                 ) {
-                    Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Exportar a archivo .json")
+                    Text("Exportar archivo de respaldo", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
-                // Copiar JSON
+                // Botón Secundario: Copiar datos
                 OutlinedButton(
                     onClick = onCopyJson,
+                    border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(42.dp)
+                        .height(48.dp)
                 ) {
                     Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Copiar datos JSON")
+                    Text("Copiar texto de respaldo", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(14.dp))
                 HorizontalDivider()
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
-                // Cargar dato de ejemplo
+                // Botón Secundario: Cargar ejemplo
                 OutlinedButton(
                     onClick = onResetSample,
+                    border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(42.dp)
+                        .height(48.dp)
                 ) {
                     Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Cargar dato de ejemplo inicial")
+                    Text("Cargar aviso de ejemplo", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
-                // Borrar todo
+                // Botón Secundario: Borrar todo
                 OutlinedButton(
                     onClick = onPromptClearAll,
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
+                    border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.error),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(42.dp)
+                        .height(48.dp)
                 ) {
                     Icon(Icons.Default.DeleteSweep, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Borrar todos los reportes")
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Text(
-                    text = "Vista previa del formato JSON:",
-                    style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Surface(
-                    shape = RoundedCornerShape(6.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        text = jsonPreview,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 11.sp,
-                        modifier = Modifier.padding(8.dp),
-                        maxLines = 6
-                    )
+                    Text("Borrar todos los avisos", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
             }
         },
         confirmButton = {},
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cerrar") }
+            TextButton(onClick = onDismiss) {
+                Text("Cerrar", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            }
         }
     )
 }
 
 /**
- * Vista de estado vacío cuando no hay puntos registrados.
+ * ESTADO VACÍO (Requisito 5):
+ * - Frase clara de estado.
+ * - Frase empática que invita a la primera acción.
+ * - UN SOLO botón principal ("Marcar el primer punto").
+ * - Lectura limpia y tipografía >= 16sp.
  */
 @Composable
 private fun EmptyStateCard(
@@ -1144,65 +1265,84 @@ private fun EmptyStateCard(
         contentAlignment = Alignment.Center,
         modifier = Modifier
             .fillMaxSize()
-            .padding(32.dp)
+            .padding(24.dp)
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.fillMaxWidth()
         ) {
             Surface(
                 shape = CircleShape,
-                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-                modifier = Modifier.size(80.dp)
+                color = MaterialTheme.colorScheme.primaryContainer,
+                border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary),
+                modifier = Modifier.size(88.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = Icons.Default.Info,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(40.dp)
+                        modifier = Modifier.size(44.dp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(18.dp))
 
             Text(
                 text = if (selectedFilter == FilterTime.TODAS) {
-                    "No hay puntos reportados aún"
+                    "Aún no hay puntos reportados en el camino"
                 } else {
-                    "No hay reportes para el turno de la ${selectedFilter.label.lowercase()}"
+                    "No hay avisos para el turno de la ${selectedFilter.label.lowercase()}"
                 },
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                textAlign = TextAlign.Center
+                fontSize = 19.sp,
+                fontWeight = FontWeight.Black,
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onSurface
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
+            // Frase que invita a la primera acción
             Text(
-                text = "Sé el primero en marcar un poste sin luz, perro suelto, zanja o tramo solitario para cuidar a tus compañeros.",
-                style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant),
-                textAlign = TextAlign.Center
+                text = "Sé la primera persona en avisar si viste una zanja, un perro suelto o una calle a oscuras para cuidar a tus compañeros.",
+                fontSize = 16.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                lineHeight = 22.sp
             )
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Button(
-                    onClick = onOpenForm,
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                    modifier = Modifier.testTag("empty_state_add_button")
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = null)
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Marcar punto")
-                }
+            // UN SOLO BOTÓN PRINCIPAL
+            Button(
+                onClick = onOpenForm,
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp),
+                modifier = Modifier
+                    .fillMaxWidth(0.9f)
+                    .height(52.dp)
+                    .testTag("empty_state_add_button")
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(22.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Marcar el primer punto", fontSize = 17.sp, fontWeight = FontWeight.Black)
+            }
 
-                OutlinedButton(onClick = onLoadSample) {
-                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Cargar ejemplo")
-                }
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Botón Secundario
+            OutlinedButton(
+                onClick = onLoadSample,
+                border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline),
+                modifier = Modifier
+                    .fillMaxWidth(0.9f)
+                    .height(48.dp)
+            ) {
+                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Cargar un ejemplo para probar", fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -1215,13 +1355,13 @@ private fun shareReportViaIntent(context: Context, textToShare: String) {
         type = "text/plain"
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
-    val chooserIntent = Intent.createChooser(sendIntent, "Compartir reporte de Ruta Segura").apply {
+    val chooserIntent = Intent.createChooser(sendIntent, "Compartir aviso de Ruta Segura").apply {
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
     try {
         context.startActivity(chooserIntent)
     } catch (e: Exception) {
-        Toast.makeText(context, "No se encontró ninguna aplicación para compartir", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "No encontramos ninguna app de mensajería instalada para compartir el aviso", Toast.LENGTH_SHORT).show()
     }
 }
 

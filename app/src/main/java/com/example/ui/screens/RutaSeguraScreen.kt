@@ -6,8 +6,13 @@ import android.content.Context
 import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,12 +40,18 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.Directions
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Refresh
@@ -48,11 +59,13 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
@@ -86,7 +99,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
@@ -97,19 +109,21 @@ import com.example.data.FilterTime
 import com.example.data.RiskCategory
 import com.example.data.RiskPointEntity
 import com.example.data.TimeOfDay
+import com.example.data.gemini.AnalisisRutaResponse
+import com.example.data.gemini.GeminiResult
+import com.example.data.gemini.RecomendacionRuta
+import com.example.data.gemini.TramoRiesgo
 import com.example.ui.viewmodel.RutaViewModel
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 /**
- * Pantalla principal de RUTA SEGURA adaptada para la versión M3 (Experiencia y Accesibilidad).
- * Cumple con los 6 requisitos de UX:
- * 1. Funciona desde 320 px de ancho, con una sola mano y sin hacer zoom.
- * 2. Alto contraste para leerse bajo luz solar directa; NINGÚN texto menor a 16 px (16 sp).
- * 3. Todos los campos con etiqueta visible fija, no solo texto de ejemplo dentro.
- * 4. Un solo botón principal por pantalla (FAB en inicio, Guardar en formulario); los demás secundarios.
- * 5. Estado vacío claro con frase motivadora que invita a la primera acción.
- * 6. Mensajes de éxito y error en español coloquial y claro, sin palabras técnicas.
+ * Pantalla principal de RUTA SEGURA (Versión M5 · Inteligencia).
+ * Integra llamada estructurada a la API de Gemini:
+ * - Agrupa reportes por tramo.
+ * - Redacta recomendación de ruta segura con justificación.
+ * - Consume JSON con esquema fijo y lo presenta como datos discretos (chips, tarjetas, niveles).
+ * - Manejo robusto de fallos con opción a modo prueba (Mock) sin gastar llamadas de API.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -131,6 +145,10 @@ fun RutaSeguraScreen(
     val selectedTimeOfDay by viewModel.selectedTimeOfDay.collectAsStateWithLifecycle()
     val formErrorMessage by viewModel.formErrorMessage.collectAsStateWithLifecycle()
     val isSaving by viewModel.isSaving.collectAsStateWithLifecycle()
+
+    // Estados de Inteligencia Artificial (Gemini)
+    val geminiState by viewModel.geminiAnalysisState.collectAsStateWithLifecycle()
+    val isAiPanelExpanded by viewModel.isAiPanelExpanded.collectAsStateWithLifecycle()
 
     var pointToShare by remember { mutableStateOf<RiskPointEntity?>(null) }
     var pointToDelete by remember { mutableStateOf<RiskPointEntity?>(null) }
@@ -184,7 +202,7 @@ fun RutaSeguraScreen(
                                     border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
                                 ) {
                                     Text(
-                                        text = "M4",
+                                        text = "M5",
                                         fontSize = 16.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.primary,
@@ -202,6 +220,21 @@ fun RutaSeguraScreen(
                     }
                 },
                 actions = {
+                    // Botón secundario para activar recomendación con IA
+                    IconButton(
+                        onClick = { viewModel.toggleAiPanel() },
+                        modifier = Modifier
+                            .size(48.dp)
+                            .testTag("ai_toggle_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Lightbulb,
+                            contentDescription = "Recomendación con IA",
+                            tint = if (geminiState is GeminiResult.Success) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(26.dp)
+                        )
+                    }
+
                     // Botón secundario para respaldo y exportación
                     IconButton(
                         onClick = { isBackupDialogOpen = true },
@@ -223,7 +256,7 @@ fun RutaSeguraScreen(
             )
         },
         floatingActionButton = {
-            // ÚNICO BOTÓN PRINCIPAL EN ESTA PANTALLA: Prominente y en la zona cómoda para el pulgar
+            // ÚNICO BOTÓN PRINCIPAL: Prominente en zona inferior para el pulgar
             ExtendedFloatingActionButton(
                 onClick = { viewModel.openForm() },
                 icon = { Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(24.dp)) },
@@ -259,8 +292,11 @@ fun RutaSeguraScreen(
             if (filteredPoints.isEmpty()) {
                 EmptyStateCard(
                     selectedFilter = selectedFilter,
+                    geminiState = geminiState,
                     onOpenForm = { viewModel.openForm() },
-                    onLoadSample = { viewModel.resetToSampleData() }
+                    onLoadSample = { viewModel.resetToSampleData() },
+                    onRequestAi = { viewModel.requestAiRouteAnalysis() },
+                    onLoadMockAi = { viewModel.loadMockAiAnalysis() }
                 )
             } else {
                 LazyColumn(
@@ -270,6 +306,37 @@ fun RutaSeguraScreen(
                         .fillMaxSize()
                         .testTag("reports_list")
                 ) {
+                    // Item 1: Tarjeta de Análisis con Inteligencia Artificial (Gemini)
+                    item(key = "ai_analysis_section") {
+                        AiRouteAnalysisCard(
+                            geminiState = geminiState,
+                            isExpanded = isAiPanelExpanded,
+                            totalPointsCount = allPoints.size,
+                            onToggleExpand = { viewModel.toggleAiPanel() },
+                            onRequestAnalysis = { viewModel.requestAiRouteAnalysis() },
+                            onLoadMock = { viewModel.loadMockAiAnalysis() },
+                            onClearAnalysis = { viewModel.clearAiAnalysis() }
+                        )
+                    }
+
+                    // Título de la lista de reportes
+                    item(key = "reports_list_header") {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = "Avisos de la comunidad estudiantil (${filteredPoints.size})",
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+
+                    // Lista de reportes
                     items(
                         items = filteredPoints,
                         key = { it.id }
@@ -376,7 +443,6 @@ fun RutaSeguraScreen(
                 )
             },
             confirmButton = {
-                // Único botón principal del diálogo
                 Button(
                     onClick = {
                         viewModel.deletePoint(point.id)
@@ -389,7 +455,6 @@ fun RutaSeguraScreen(
                 }
             },
             dismissButton = {
-                // Botón secundario
                 OutlinedButton(
                     onClick = { pointToDelete = null },
                     modifier = Modifier.height(48.dp)
@@ -478,8 +543,504 @@ fun RutaSeguraScreen(
 }
 
 /**
+ * COMPONENTE CLAVE (M5 · Inteligencia):
+ * Muestra el análisis de ruta con Gemini consumiendo JSON estructurado y presentándolo como DATOS:
+ * - Tramo por tramo con nivel de riesgo (ALTO, MEDIO, BAJO).
+ * - Chips de reportes asociados.
+ * - Recomendación de ruta segura con calificación y justificación técnica.
+ * - Manejo a prueba de fallos y botón de prueba sin consumo de API.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AiRouteAnalysisCard(
+    geminiState: GeminiResult,
+    isExpanded: Boolean,
+    totalPointsCount: Int,
+    onToggleExpand: () -> Unit,
+    onRequestAnalysis: () -> Unit,
+    onLoadMock: () -> Unit,
+    onClearAnalysis: () -> Unit
+) {
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("ai_analysis_card")
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            // Cabecera interactiva del panel de IA
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onToggleExpand() }
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Directions,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = "Ruta Segura Inteligente",
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Black,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Análisis de tramos con IA",
+                            fontSize = 16.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                IconButton(onClick = onToggleExpand, modifier = Modifier.size(40.dp)) {
+                    Icon(
+                        imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = if (isExpanded) "Ocultar panel" else "Mostrar panel",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
+            AnimatedVisibility(
+                visible = isExpanded,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
+            ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Spacer(modifier = Modifier.height(14.dp))
+                    HorizontalDivider()
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    when (geminiState) {
+                        is GeminiResult.Idle -> {
+                            Text(
+                                text = "La inteligencia artificial agrupa los $totalPointsCount avisos registrados para calcular qué tramos tienen mayor riesgo y cuál es el desvío más seguro.",
+                                fontSize = 16.sp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                lineHeight = 22.sp
+                            )
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            // Botón principal
+                            Button(
+                                onClick = onRequestAnalysis,
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp)
+                                    .testTag("btn_request_gemini")
+                            ) {
+                                Icon(Icons.Default.Lightbulb, contentDescription = null, modifier = Modifier.size(20.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Analizar tramos con Gemini", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // Botón secundario para probar sin gastar API
+                            OutlinedButton(
+                                onClick = onLoadMock,
+                                border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp)
+                                    .testTag("btn_load_mock_ai")
+                            ) {
+                                Text("Cargar datos de prueba (sin gastar API)", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+
+                        is GeminiResult.Loading -> {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 16.dp)
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(40.dp),
+                                    strokeWidth = 3.dp,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.height(14.dp))
+                                Text(
+                                    text = "Consultando a Gemini 3.5 Flash...",
+                                    fontSize = 17.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Agrupando reportes por tramo y calculando el camino más seguro.",
+                                    fontSize = 16.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+
+                        is GeminiResult.Error -> {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.errorContainer,
+                                border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.error),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.Warning,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.error,
+                                            modifier = Modifier.size(22.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "No se pudo completar el análisis",
+                                            fontSize = 17.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onErrorContainer
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = geminiState.userFriendlyMessage,
+                                        fontSize = 16.sp,
+                                        color = MaterialTheme.colorScheme.onErrorContainer,
+                                        lineHeight = 22.sp
+                                    )
+                                    Spacer(modifier = Modifier.height(12.dp))
+
+                                    // Botón principal de recuperación
+                                    Button(
+                                        onClick = onLoadMock,
+                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(48.dp)
+                                    ) {
+                                        Text("Ver ejemplo de prueba (sin gastar llamadas)", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    // Botón secundario para reintentar
+                                    OutlinedButton(
+                                        onClick = onRequestAnalysis,
+                                        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(48.dp)
+                                    ) {
+                                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Reintentar con la API", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+
+                        is GeminiResult.Success -> {
+                            val data = geminiState.data
+
+                            // Etiqueta indicadora del origen (Gemini vs Mock)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = if (geminiState.isMock) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.primaryContainer,
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                                ) {
+                                    Text(
+                                        text = if (geminiState.isMock) "📋 Datos de prueba cargados" else "✨ Generado por Gemini 3.5 Flash",
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (geminiState.isMock) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+
+                                IconButton(onClick = onClearAnalysis, modifier = Modifier.size(36.dp)) {
+                                    Icon(Icons.Default.Close, contentDescription = "Cerrar análisis", tint = MaterialTheme.colorScheme.outline)
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            // 1. DATO DISCRETO: RECOMENDACIÓN DE RUTA SEGURA
+                            RecomendacionRutaSection(data.recomendacion)
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            // 2. DATO DISCRETO: LISTA DE TRAMOS AGRUPADOS
+                            Text(
+                                text = "Tramos agrupados por riesgo:",
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                data.tramos.forEach { tramo ->
+                                    TramoRiesgoCard(tramo)
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            // Botón secundario para refrescar análisis
+                            OutlinedButton(
+                                onClick = onRequestAnalysis,
+                                border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp)
+                            ) {
+                                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Actualizar análisis con IA", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Muestra la recomendación de ruta segura como campos de datos discretos.
+ */
+@Composable
+private fun RecomendacionRutaSection(recomendacion: RecomendacionRuta) {
+    val (badgeBg, badgeBorder, badgeTextColor) = when (recomendacion.calificacionSeguridad.uppercase()) {
+        "SEGURA" -> Triple(Color(0xFFDCFCE7), Color(0xFF16A34A), Color(0xFF166534))
+        "PELIGROSA" -> Triple(Color(0xFFFEE2E2), Color(0xFFDC2626), Color(0xFF991B1B))
+        else -> Triple(Color(0xFFFEF3C7), Color(0xFFD97706), Color(0xFF92400E))
+    }
+
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "Camino sugerido:",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+
+                // Calificación como dato en badge
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = badgeBg,
+                    border = BorderStroke(1.5.dp, badgeBorder)
+                ) {
+                    Text(
+                        text = recomendacion.calificacionSeguridad.uppercase(),
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Black,
+                        color = badgeTextColor,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Ruta sugerida
+            Text(
+                text = recomendacion.rutaSugerida,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Black,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Justificación técnica
+            Row(verticalAlignment = Alignment.Top) {
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .size(20.dp)
+                        .padding(top = 2.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Column {
+                    Text(
+                        text = "Justificación:",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = recomendacion.justificacion,
+                        fontSize = 16.sp,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        lineHeight = 22.sp
+                    )
+                }
+            }
+
+            if (recomendacion.horarioRecomendado.isNotBlank()) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Schedule,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Horario: ${recomendacion.horarioRecomendado}",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Muestra cada tramo individual con sus datos discretos (Nivel de riesgo, reportes asociados y advertencia).
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun TramoRiesgoCard(tramo: TramoRiesgo) {
+    val (riskBg, riskBorder, riskText) = when (tramo.nivelRiesgo.uppercase()) {
+        "ALTO" -> Triple(Color(0xFFFEE2E2), Color(0xFFDC2626), Color(0xFF991B1B))
+        "BAJO" -> Triple(Color(0xFFDCFCE7), Color(0xFF16A34A), Color(0xFF166534))
+        else -> Triple(Color(0xFFFEF3C7), Color(0xFFD97706), Color(0xFF92400E))
+    }
+
+    Card(
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outlineVariant),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = tramo.nombreTramo,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Black,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
+                )
+
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = riskBg,
+                    border = BorderStroke(1.dp, riskBorder)
+                ) {
+                    Text(
+                        text = "RIESGO ${tramo.nivelRiesgo.uppercase()}",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Black,
+                        color = riskText,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+            }
+
+            if (tramo.reportesAsociados.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    tramo.reportesAsociados.forEach { reporte ->
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                        ) {
+                            Text(
+                                text = "⚠️ $reporte",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "💡 ${tramo.advertencia}",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface,
+                lineHeight = 22.sp
+            )
+        }
+    }
+}
+
+/**
  * Filtro horario horizontal adaptable a pantallas estrechas (320px).
- * Textos en 16.sp con alto contraste.
  */
 @Composable
 private fun FilterSection(
@@ -509,7 +1070,6 @@ private fun FilterSection(
                     tint = MaterialTheme.colorScheme.primary
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                // Etiqueta visible del filtro con texto >= 16sp
                 Text(
                     text = "Filtrar por horario:",
                     fontSize = 16.sp,
@@ -579,10 +1139,6 @@ private fun FilterSection(
 
 /**
  * Tarjeta individual de reporte.
- * - Alto contraste (fondo blanco, texto oscuro, bordes sólidos).
- * - Tamaño de letra nunca menor a 16 px.
- * - Botones secundarios claros (Compartir / Copiar).
- * - Disposición vertical/responsiva para no romperse en 320 px de ancho.
  */
 @Composable
 private fun RiskPointCard(
@@ -608,7 +1164,6 @@ private fun RiskPointCard(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            // Fila superior: Tipo de peligro + Momento del día
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -667,7 +1222,6 @@ private fun RiskPointCard(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Ubicación del reporte con etiqueta visible y texto >= 16sp
             Row(verticalAlignment = Alignment.Top) {
                 Icon(
                     imageVector = Icons.Default.LocationOn,
@@ -707,7 +1261,6 @@ private fun RiskPointCard(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Botones SECUNDARIOS: En 320px de ancho se ajustan en FlowRow para no desbordar
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -717,7 +1270,6 @@ private fun RiskPointCard(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.weight(1f, fill = false)
                 ) {
-                    // Botón secundario: Compartir
                     OutlinedButton(
                         onClick = onDirectShareApp,
                         shape = RoundedCornerShape(8.dp),
@@ -732,7 +1284,6 @@ private fun RiskPointCard(
                         Text(text = "Compartir", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     }
 
-                    // Botón secundario: Copiar
                     OutlinedButton(
                         onClick = onCopyText,
                         shape = RoundedCornerShape(8.dp),
@@ -748,7 +1299,6 @@ private fun RiskPointCard(
                     }
                 }
 
-                // Botón secundario: Borrar
                 IconButton(
                     onClick = onDeleteClick,
                     modifier = Modifier.size(44.dp)
@@ -767,11 +1317,6 @@ private fun RiskPointCard(
 
 /**
  * Formulario para marcar un punto nuevo.
- * Requisitos cumplidos:
- * - Se usa con una sola mano desde abajo (Bottom Sheet con scroll).
- * - Todas las etiquetas son VISIBLES permanentemente.
- * - Textos en 16.sp o superior con contraste para luz solar.
- * - Un solo botón principal ("Guardar aviso"). Cancelar es secundario.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -811,7 +1356,6 @@ private fun NewRiskPointFormContent(
 
         Spacer(modifier = Modifier.height(18.dp))
 
-        // 1. ETIQUETA VISIBLE OBLIGATORIA: Categoría
         Text(
             text = "1. Seleccioná qué peligro viste:",
             fontSize = 17.sp,
@@ -862,7 +1406,6 @@ private fun NewRiskPointFormContent(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // 2. ETIQUETA VISIBLE OBLIGATORIA: Descripción escrita
         Text(
             text = "2. Escribí dónde está el peligro:",
             fontSize = 17.sp,
@@ -874,7 +1417,6 @@ private fun NewRiskPointFormContent(
         OutlinedTextField(
             value = descriptionInput,
             onValueChange = onDescriptionChange,
-            // Etiqueta flotante visible permanentemente
             label = {
                 Text(
                     text = "Ubicación del peligro",
@@ -929,7 +1471,6 @@ private fun NewRiskPointFormContent(
 
         Spacer(modifier = Modifier.height(18.dp))
 
-        // 3. ETIQUETA VISIBLE OBLIGATORIA: Hora del día
         Text(
             text = "3. ¿Cuándo es más peligroso pasar?:",
             fontSize = 17.sp,
@@ -981,12 +1522,10 @@ private fun NewRiskPointFormContent(
 
         Spacer(modifier = Modifier.height(28.dp))
 
-        // BOTONES DE ACCIÓN: UN SOLO BOTÓN PRINCIPAL
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // Botón Secundario
             OutlinedButton(
                 onClick = onCancel,
                 border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline),
@@ -997,7 +1536,6 @@ private fun NewRiskPointFormContent(
                 Text("Cancelar", fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
 
-            // ÚNICO BOTÓN PRINCIPAL: Relleno sólido llamativo y blindado contra doble toque
             Button(
                 onClick = onSave,
                 enabled = !isSaving,
@@ -1009,7 +1547,7 @@ private fun NewRiskPointFormContent(
                     .testTag("save_report_button")
             ) {
                 if (isSaving) {
-                    androidx.compose.material3.CircularProgressIndicator(
+                    CircularProgressIndicator(
                         modifier = Modifier.size(22.dp),
                         color = MaterialTheme.colorScheme.onPrimary,
                         strokeWidth = 2.5.dp
@@ -1028,7 +1566,6 @@ private fun NewRiskPointFormContent(
 
 /**
  * Diálogo modal para compartir reporte.
- * Un solo botón principal (Compartir por apps), los demás son secundarios.
  */
 @Composable
 private fun SharePointDialog(
@@ -1071,7 +1608,6 @@ private fun SharePointDialog(
                 }
                 Spacer(modifier = Modifier.height(18.dp))
 
-                // ÚNICO BOTÓN PRINCIPAL
                 Button(
                     onClick = onShareViaSystem,
                     modifier = Modifier
@@ -1086,7 +1622,6 @@ private fun SharePointDialog(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Botón Secundario: Copiar texto
                 OutlinedButton(
                     onClick = onCopyText,
                     border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline),
@@ -1102,7 +1637,6 @@ private fun SharePointDialog(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Botón Secundario: Copiar enlace
                 OutlinedButton(
                     onClick = onCopyLink,
                     border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline),
@@ -1128,7 +1662,6 @@ private fun SharePointDialog(
 
 /**
  * Diálogo de respaldo local.
- * Un solo botón principal para exportar el archivo .json.
  */
 @Composable
 private fun StorageBackupDialog(
@@ -1189,7 +1722,6 @@ private fun StorageBackupDialog(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // ÚNICO BOTÓN PRINCIPAL
                 Button(
                     onClick = onExportFile,
                     modifier = Modifier
@@ -1204,7 +1736,6 @@ private fun StorageBackupDialog(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Botón Secundario: Copiar datos
                 OutlinedButton(
                     onClick = onCopyJson,
                     border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline),
@@ -1221,7 +1752,6 @@ private fun StorageBackupDialog(
                 HorizontalDivider()
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Botón Secundario: Cargar ejemplo
                 OutlinedButton(
                     onClick = onResetSample,
                     border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline),
@@ -1236,7 +1766,6 @@ private fun StorageBackupDialog(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Botón Secundario: Borrar todo
                 OutlinedButton(
                     onClick = onPromptClearAll,
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
@@ -1261,17 +1790,16 @@ private fun StorageBackupDialog(
 }
 
 /**
- * ESTADO VACÍO (Requisito 5):
- * - Frase clara de estado.
- * - Frase empática que invita a la primera acción.
- * - UN SOLO botón principal ("Marcar el primer punto").
- * - Lectura limpia y tipografía >= 16sp.
+ * ESTADO VACÍO: Invita a la primera acción o a probar la IA con datos de prueba.
  */
 @Composable
 private fun EmptyStateCard(
     selectedFilter: FilterTime,
+    geminiState: GeminiResult,
     onOpenForm: () -> Unit,
-    onLoadSample: () -> Unit
+    onLoadSample: () -> Unit,
+    onRequestAi: () -> Unit,
+    onLoadMockAi: () -> Unit
 ) {
     Box(
         contentAlignment = Alignment.Center,
@@ -1316,7 +1844,6 @@ private fun EmptyStateCard(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Frase que invita a la primera acción
             Text(
                 text = "Sé la primera persona en avisar si viste una zanja, un perro suelto o una calle a oscuras para cuidar a tus compañeros.",
                 fontSize = 16.sp,
@@ -1327,7 +1854,6 @@ private fun EmptyStateCard(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // UN SOLO BOTÓN PRINCIPAL
             Button(
                 onClick = onOpenForm,
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
@@ -1344,7 +1870,6 @@ private fun EmptyStateCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Botón Secundario
             OutlinedButton(
                 onClick = onLoadSample,
                 border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline),
@@ -1355,6 +1880,20 @@ private fun EmptyStateCard(
                 Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Cargar un ejemplo para probar", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            OutlinedButton(
+                onClick = onLoadMockAi,
+                border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary),
+                modifier = Modifier
+                    .fillMaxWidth(0.9f)
+                    .height(48.dp)
+            ) {
+                Icon(Icons.Default.Directions, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Probar recomendación con IA", fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
         }
     }

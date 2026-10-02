@@ -8,12 +8,16 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.BuildConfig
 import com.example.data.AppDatabase
 import com.example.data.FilterTime
 import com.example.data.RiskCategory
 import com.example.data.RiskPointEntity
 import com.example.data.RiskRepository
 import com.example.data.TimeOfDay
+import com.example.data.gemini.AnalisisRutaResponse
+import com.example.data.gemini.GeminiClient
+import com.example.data.gemini.GeminiResult
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -105,6 +109,54 @@ class RutaViewModel(
     // Mensajes para el Snackbar (retroalimentación instantánea)
     private val _userFeedback = MutableSharedFlow<String>()
     val userFeedback: SharedFlow<String> = _userFeedback.asSharedFlow()
+
+    // Estado del análisis de IA con Gemini
+    private val _geminiAnalysisState = MutableStateFlow<GeminiResult>(GeminiResult.Idle)
+    val geminiAnalysisState: StateFlow<GeminiResult> = _geminiAnalysisState.asStateFlow()
+
+    private val _isAiPanelExpanded = MutableStateFlow(false)
+    val isAiPanelExpanded: StateFlow<Boolean> = _isAiPanelExpanded.asStateFlow()
+
+    fun toggleAiPanel() {
+        _isAiPanelExpanded.value = !_isAiPanelExpanded.value
+    }
+
+    fun requestAiRouteAnalysis() {
+        viewModelScope.launch {
+            _geminiAnalysisState.value = GeminiResult.Loading
+            _isAiPanelExpanded.value = true
+            val currentPoints = repository.allPoints.first()
+            val result = GeminiClient.analyzeRoutes(
+                apiKey = BuildConfig.GEMINI_API_KEY,
+                points = currentPoints
+            )
+            _geminiAnalysisState.value = result
+            when (result) {
+                is GeminiResult.Success -> {
+                    _userFeedback.emit("¡Ruta analizada con éxito por la IA!")
+                }
+                is GeminiResult.Error -> {
+                    _userFeedback.emit(result.userFriendlyMessage)
+                }
+                else -> Unit
+            }
+        }
+    }
+
+    fun loadMockAiAnalysis() {
+        _isAiPanelExpanded.value = true
+        _geminiAnalysisState.value = GeminiResult.Success(
+            data = GeminiClient.SAMPLE_MOCK_ANALISIS,
+            isMock = true
+        )
+        viewModelScope.launch {
+            _userFeedback.emit("Análisis de prueba cargado (sin gastar llamadas de API).")
+        }
+    }
+
+    fun clearAiAnalysis() {
+        _geminiAnalysisState.value = GeminiResult.Idle
+    }
 
     fun onFilterChanged(newFilter: FilterTime) {
         _selectedFilter.value = newFilter

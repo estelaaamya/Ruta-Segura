@@ -98,6 +98,10 @@ class RutaViewModel(
     private val _formErrorMessage = MutableStateFlow<String?>(null)
     val formErrorMessage: StateFlow<String?> = _formErrorMessage.asStateFlow()
 
+    // Guardia contra pulsaciones múltiples (doble toque)
+    private val _isSaving = MutableStateFlow(false)
+    val isSaving: StateFlow<Boolean> = _isSaving.asStateFlow()
+
     // Mensajes para el Snackbar (retroalimentación instantánea)
     private val _userFeedback = MutableSharedFlow<String>()
     val userFeedback: SharedFlow<String> = _userFeedback.asSharedFlow()
@@ -110,12 +114,15 @@ class RutaViewModel(
         val defaultTime = determineCurrentTimeOfDay()
         _selectedTimeOfDay.value = defaultTime
         _formErrorMessage.value = null
+        _isSaving.value = false
         _isFormVisible.value = true
     }
 
     fun closeForm() {
-        _isFormVisible.value = false
-        _formErrorMessage.value = null
+        if (!_isSaving.value) {
+            _isFormVisible.value = false
+            _formErrorMessage.value = null
+        }
     }
 
     fun onCategorySelected(category: String) {
@@ -123,11 +130,10 @@ class RutaViewModel(
     }
 
     fun onDescriptionChanged(newDescription: String) {
-        if (newDescription.length <= 150) {
-            _descriptionInput.value = newDescription
-            if (_formErrorMessage.value != null && newDescription.isNotBlank()) {
-                _formErrorMessage.value = null
-            }
+        // Acepta pegado masivo de más de 500 caracteres recortando automáticamente a 150
+        _descriptionInput.value = newDescription.take(150)
+        if (_formErrorMessage.value != null && newDescription.trim().length >= 3) {
+            _formErrorMessage.value = null
         }
     }
 
@@ -136,23 +142,41 @@ class RutaViewModel(
     }
 
     /**
-     * OPERACIÓN: GUARDAR
-     * Inserta el punto de riesgo en la base de datos persistente local.
+     * OPERACIÓN: GUARDAR CON VALIDACIONES DEFENSIVAS
      */
     fun saveRiskPoint() {
-        val description = _descriptionInput.value.trim()
-        if (description.isBlank()) {
-            _formErrorMessage.value = "Por favor escribí la ubicación del peligro para avisar a tus compañeros"
+        // Evita doble toque o concurrencia
+        if (_isSaving.value) return
+
+        // Sanitización: colapsa saltos de línea repetidos y limpia bordes
+        val cleanedDescription = _descriptionInput.value
+            .replace(Regex("\\n{2,}"), "\n")
+            .trim()
+
+        if (cleanedDescription.isBlank()) {
+            _formErrorMessage.value = "Por favor escribí la ubicación del peligro para avisar a tus compañeros."
             return
         }
 
-        val currentTimeString = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
+        if (cleanedDescription.length < 3) {
+            _formErrorMessage.value = "Por favor escribí al menos 3 letras para describir la ubicación."
+            return
+        }
+
+        // Obtención de hora tolerante a fallos
+        val currentTimeString = try {
+            SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
+        } catch (e: Exception) {
+            "Hora no registrada"
+        }
+
+        _isSaving.value = true
 
         viewModelScope.launch {
             try {
                 repository.insertPoint(
                     category = _selectedCategory.value,
-                    description = description,
+                    description = cleanedDescription,
                     timeOfDay = _selectedTimeOfDay.value,
                     exactTime = currentTimeString
                 )
@@ -162,6 +186,8 @@ class RutaViewModel(
                 _userFeedback.emit("¡Aviso guardado! Ya se muestra en la lista para tus compañeros.")
             } catch (e: Exception) {
                 _formErrorMessage.value = "No se pudo guardar el aviso. Por favor intentá de nuevo."
+            } finally {
+                _isSaving.value = false
             }
         }
     }
@@ -262,6 +288,8 @@ class RutaViewModel(
                 }
                 context.startActivity(chooser)
                 _userFeedback.emit("Archivo de respaldo preparado para compartir o guardar.")
+            } catch (e: java.io.IOException) {
+                _userFeedback.emit("Tu celular no tiene suficiente espacio libre para guardar el archivo.")
             } catch (e: Exception) {
                 _userFeedback.emit("No se pudo crear el archivo de respaldo. Por favor intentá de nuevo.")
             }

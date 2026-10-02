@@ -130,6 +130,7 @@ fun RutaSeguraScreen(
     val descriptionInput by viewModel.descriptionInput.collectAsStateWithLifecycle()
     val selectedTimeOfDay by viewModel.selectedTimeOfDay.collectAsStateWithLifecycle()
     val formErrorMessage by viewModel.formErrorMessage.collectAsStateWithLifecycle()
+    val isSaving by viewModel.isSaving.collectAsStateWithLifecycle()
 
     var pointToShare by remember { mutableStateOf<RiskPointEntity?>(null) }
     var pointToDelete by remember { mutableStateOf<RiskPointEntity?>(null) }
@@ -183,7 +184,7 @@ fun RutaSeguraScreen(
                                     border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
                                 ) {
                                     Text(
-                                        text = "M3",
+                                        text = "M4",
                                         fontSize = 16.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.primary,
@@ -312,6 +313,7 @@ fun RutaSeguraScreen(
                 descriptionInput = descriptionInput,
                 selectedTimeOfDay = selectedTimeOfDay,
                 errorMessage = formErrorMessage,
+                isSaving = isSaving,
                 onCategoryChange = { viewModel.onCategorySelected(it) },
                 onDescriptionChange = { viewModel.onDescriptionChanged(it) },
                 onTimeOfDayChange = { viewModel.onTimeOfDaySelected(it) },
@@ -778,6 +780,7 @@ private fun NewRiskPointFormContent(
     descriptionInput: String,
     selectedTimeOfDay: String,
     errorMessage: String?,
+    isSaving: Boolean,
     onCategoryChange: (String) -> Unit,
     onDescriptionChange: (String) -> Unit,
     onTimeOfDayChange: (String) -> Unit,
@@ -994,9 +997,10 @@ private fun NewRiskPointFormContent(
                 Text("Cancelar", fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
 
-            // ÚNICO BOTÓN PRINCIPAL: Relleno sólido llamativo
+            // ÚNICO BOTÓN PRINCIPAL: Relleno sólido llamativo y blindado contra doble toque
             Button(
                 onClick = onSave,
+                enabled = !isSaving,
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp),
                 modifier = Modifier
@@ -1004,9 +1008,17 @@ private fun NewRiskPointFormContent(
                     .height(52.dp)
                     .testTag("save_report_button")
             ) {
-                Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(20.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Guardar aviso", fontSize = 17.sp, fontWeight = FontWeight.Black)
+                if (isSaving) {
+                    androidx.compose.material3.CircularProgressIndicator(
+                        modifier = Modifier.size(22.dp),
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        strokeWidth = 2.5.dp
+                    )
+                } else {
+                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Guardar aviso", fontSize = 17.sp, fontWeight = FontWeight.Black)
+                }
             }
         }
 

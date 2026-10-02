@@ -179,7 +179,7 @@ fun RutaSeguraScreen(
                                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
                                 ) {
                                     Text(
-                                        text = "M1",
+                                        text = "M2",
                                         style = MaterialTheme.typography.labelSmall.copy(
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.primary

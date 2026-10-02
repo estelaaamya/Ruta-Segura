@@ -34,4 +34,7 @@ interface RiskPointDao {
 
     @Query("SELECT COUNT(*) FROM risk_points")
     suspend fun countPoints(): Int
+
+    @Query("DELETE FROM risk_points")
+    suspend fun deleteAllPoints()
 }

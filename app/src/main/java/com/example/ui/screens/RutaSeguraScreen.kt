@@ -6,14 +6,8 @@ import android.content.Context
 import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,33 +26,39 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DividerDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -83,15 +83,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -99,19 +97,17 @@ import com.example.data.FilterTime
 import com.example.data.RiskCategory
 import com.example.data.RiskPointEntity
 import com.example.data.TimeOfDay
-import com.example.ui.theme.AmberAlert
-import com.example.ui.theme.NavyDark
-import com.example.ui.theme.SafetyBluePrimary
 import com.example.ui.viewmodel.RutaViewModel
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 /**
  * Pantalla principal de RUTA SEGURA.
- * Integra las 3 funciones exigidas:
- * 1. Marcar punto (Categoría, Ubicación escrita, Hora del día)
- * 2. Ver lista de puntos filtrada por hora del día (Mañana, Tarde, Noche)
- * 3. Compartir reporte por enlace o por texto (copiar al portapapeles o menú nativo de compartir)
+ * Funciones clave:
+ * 1. Marcar un punto del camino con categoría, ubicación escrita y hora del día.
+ * 2. Ver la lista de puntos reportados filtrada por hora del día (Mañana, Tarde, Noche).
+ * 3. Compartir reporte por enlace o por texto.
+ * 4. Almacenamiento local persistente: Respaldo, exportación a archivo .json y gestión de datos.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -123,7 +119,7 @@ fun RutaSeguraScreen(
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Estados observados reactivamente desde el ViewModel
+    // Estados observados desde el ViewModel
     val selectedFilter by viewModel.selectedFilter.collectAsStateWithLifecycle()
     val allPoints by viewModel.allPoints.collectAsStateWithLifecycle()
     val filteredPoints by viewModel.filteredPoints.collectAsStateWithLifecycle()
@@ -133,11 +129,12 @@ fun RutaSeguraScreen(
     val selectedTimeOfDay by viewModel.selectedTimeOfDay.collectAsStateWithLifecycle()
     val formErrorMessage by viewModel.formErrorMessage.collectAsStateWithLifecycle()
 
-    // Estado para el modal de compartir un punto específico
+    // Modales de interacción
     var pointToShare by remember { mutableStateOf<RiskPointEntity?>(null) }
     var pointToDelete by remember { mutableStateOf<RiskPointEntity?>(null) }
+    var isBackupDialogOpen by remember { mutableStateOf(false) }
+    var isClearAllConfirmOpen by remember { mutableStateOf(false) }
 
-    // Manejo de mensajes instantáneos en pantalla mediante Snackbar
     LaunchedEffect(Unit) {
         viewModel.userFeedback.collectLatest { message ->
             snackbarHostState.showSnackbar(message)
@@ -167,13 +164,30 @@ fun RutaSeguraScreen(
                         }
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
-                            Text(
-                                text = "RUTA SEGURA",
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = FontWeight.Black,
-                                    letterSpacing = 1.sp
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "RUTA SEGURA",
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.Black,
+                                        letterSpacing = 1.sp
+                                    )
                                 )
-                            )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
+                                ) {
+                                    Text(
+                                        text = "M1",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        ),
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
+                                    )
+                                }
+                            }
                             Text(
                                 text = "Puntos de cuidado camino al instituto",
                                 style = MaterialTheme.typography.bodySmall.copy(
@@ -181,6 +195,19 @@ fun RutaSeguraScreen(
                                 )
                             )
                         }
+                    }
+                },
+                actions = {
+                    // Botón para acceder al respaldo y exportación de datos locales
+                    IconButton(
+                        onClick = { isBackupDialogOpen = true },
+                        modifier = Modifier.testTag("storage_backup_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Storage,
+                            contentDescription = "Almacenamiento y respaldo",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -205,7 +232,7 @@ fun RutaSeguraScreen(
                 .padding(innerPadding)
         ) {
             // ==========================================
-            // SECCIÓN: Filtro horario (Mañana, Tarde, Noche)
+            // SECCIÓN 1: Filtro horario (Mañana, Tarde, Noche)
             // ==========================================
             FilterSection(
                 selectedFilter = selectedFilter,
@@ -214,12 +241,13 @@ fun RutaSeguraScreen(
             )
 
             // ==========================================
-            // SECCIÓN: Lista de puntos reportados
+            // SECCIÓN 2: Lista de puntos reportados
             // ==========================================
             if (filteredPoints.isEmpty()) {
                 EmptyStateCard(
                     selectedFilter = selectedFilter,
-                    onOpenForm = { viewModel.openForm() }
+                    onOpenForm = { viewModel.openForm() },
+                    onLoadSample = { viewModel.resetToSampleData() }
                 )
             } else {
                 LazyColumn(
@@ -265,7 +293,6 @@ fun RutaSeguraScreen(
             containerColor = MaterialTheme.colorScheme.surface,
             modifier = Modifier.testTag("new_point_bottom_sheet")
         ) {
-            // Manejador del botón atrás físico en Android para cerrar el formulario
             BackHandler {
                 viewModel.closeForm()
             }
@@ -285,7 +312,7 @@ fun RutaSeguraScreen(
     }
 
     // ========================================================
-    // DIÁLOGO DE COMPARTIR: Enlace o Texto
+    // DIÁLOGO: Compartir Enlace o Texto
     // ========================================================
     pointToShare?.let { point ->
         SharePointDialog(
@@ -314,14 +341,14 @@ fun RutaSeguraScreen(
     }
 
     // ========================================================
-    // DIÁLOGO DE CONFIRMACIÓN DE ELIMINACIÓN
+    // DIÁLOGO: Confirmar eliminación individual
     // ========================================================
     pointToDelete?.let { point ->
         AlertDialog(
             onDismissRequest = { pointToDelete = null },
             icon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
             title = { Text("¿Eliminar este reporte?", fontWeight = FontWeight.Bold) },
-            text = { Text("Se quitará el punto \"${point.category}\" en \"${point.description}\" de la lista de advertencias.") },
+            text = { Text("Se quitará el punto \"${point.category}\" en \"${point.description}\" de la base de datos local.") },
             confirmButton = {
                 Button(
                     onClick = {
@@ -335,6 +362,62 @@ fun RutaSeguraScreen(
             },
             dismissButton = {
                 TextButton(onClick = { pointToDelete = null }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
+    // ========================================================
+    // DIÁLOGO: Gestión de Almacenamiento Local y Respaldo
+    // ========================================================
+    if (isBackupDialogOpen) {
+        StorageBackupDialog(
+            totalCount = allPoints.size,
+            jsonPreview = viewModel.exportToJson(),
+            onDismiss = { isBackupDialogOpen = false },
+            onExportFile = {
+                viewModel.exportBackupFile(context)
+                isBackupDialogOpen = false
+            },
+            onCopyJson = {
+                copyToClipboard(context, "JSON Respaldo Ruta Segura", viewModel.exportToJson())
+                isBackupDialogOpen = false
+                coroutineScope.launch {
+                    snackbarHostState.showSnackbar("¡Datos JSON copiados al portapapeles!")
+                }
+            },
+            onResetSample = {
+                viewModel.resetToSampleData()
+                isBackupDialogOpen = false
+            },
+            onPromptClearAll = {
+                isBackupDialogOpen = false
+                isClearAllConfirmOpen = true
+            }
+        )
+    }
+
+    // Confirmación para vaciar toda la memoria local
+    if (isClearAllConfirmOpen) {
+        AlertDialog(
+            onDismissRequest = { isClearAllConfirmOpen = false },
+            icon = { Icon(Icons.Default.DeleteSweep, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text("¿Borrar todos los reportes?", fontWeight = FontWeight.Bold) },
+            text = { Text("Esta acción eliminará todos los puntos guardados en la memoria del teléfono.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.clearAllPoints()
+                        isClearAllConfirmOpen = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Borrar todo")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { isClearAllConfirmOpen = false }) {
                     Text("Cancelar")
                 }
             }
@@ -434,7 +517,6 @@ private fun FilterSection(
 
 /**
  * Tarjeta individual para mostrar un punto reportado.
- * Muestra categoría, descripción y hora, con botones directos para compartir o copiar.
  */
 @Composable
 private fun RiskPointCard(
@@ -448,9 +530,7 @@ private fun RiskPointCard(
 
     Card(
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
         modifier = Modifier
@@ -462,13 +542,11 @@ private fun RiskPointCard(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            // Fila superior: Categoría con badge colorido + Hora del día
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Badge de categoría
                 Surface(
                     shape = RoundedCornerShape(8.dp),
                     color = categoryMeta.color.copy(alpha = 0.15f),
@@ -495,7 +573,6 @@ private fun RiskPointCard(
                     }
                 }
 
-                // Badge de Hora del día (Mañana, Tarde, Noche)
                 Surface(
                     shape = RoundedCornerShape(8.dp),
                     color = MaterialTheme.colorScheme.secondaryContainer
@@ -504,13 +581,8 @@ private fun RiskPointCard(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
-                        val timeIcon = when (point.timeOfDay.lowercase()) {
-                            "mañana" -> Icons.Default.Schedule
-                            "tarde" -> Icons.Default.Schedule
-                            else -> Icons.Default.Schedule
-                        }
                         Icon(
-                            imageVector = timeIcon,
+                            imageVector = Icons.Default.Schedule,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSecondaryContainer,
                             modifier = Modifier.size(14.dp)
@@ -529,7 +601,6 @@ private fun RiskPointCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Descripción de la ubicación
             Row(verticalAlignment = Alignment.Top) {
                 Icon(
                     imageVector = Icons.Default.LocationOn,
@@ -568,47 +639,35 @@ private fun RiskPointCard(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Fila de acciones: Botones para compartir por app y copiar texto
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    // Botón Menú Compartir celular
                     OutlinedButton(
                         onClick = onDirectShareApp,
                         shape = RoundedCornerShape(8.dp),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                         modifier = Modifier.testTag("share_button_${point.id}")
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Share,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
+                        Icon(imageVector = Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(text = "Compartir", style = MaterialTheme.typography.labelMedium)
                     }
 
-                    // Botón Copiar texto directo
                     OutlinedButton(
                         onClick = onCopyText,
                         shape = RoundedCornerShape(8.dp),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                         modifier = Modifier.testTag("copy_text_button_${point.id}")
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.ContentCopy,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
+                        Icon(imageVector = Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(text = "Copiar", style = MaterialTheme.typography.labelMedium)
                     }
                 }
 
-                // Menú de opciones adicionales / Eliminar
                 IconButton(
                     onClick = onDeleteClick,
                     modifier = Modifier.size(36.dp)
@@ -626,7 +685,6 @@ private fun RiskPointCard(
 
 /**
  * Contenido del formulario para marcar un punto nuevo.
- * Incluye selección de categoría, descripción escrita y selección de hora del día.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -659,9 +717,7 @@ private fun NewRiskPointFormContent(
 
         Spacer(modifier = Modifier.height(18.dp))
 
-        // ------------------------------------------
-        // 1. CATEGORÍA (Poste sin luz, perro suelto, zanja, tramo solitario)
-        // ------------------------------------------
+        // 1. Categoría
         Text(
             text = "1. Selecciona la categoría:",
             style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
@@ -675,11 +731,6 @@ private fun NewRiskPointFormContent(
         ) {
             RiskCategory.entries.forEach { category ->
                 val isSelected = selectedCategory == category.displayName
-                val chipColor by animateColorAsState(
-                    targetValue = if (isSelected) category.color else MaterialTheme.colorScheme.surfaceVariant,
-                    label = "chipColor"
-                )
-
                 Surface(
                     shape = RoundedCornerShape(12.dp),
                     color = if (isSelected) category.color.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surfaceVariant,
@@ -716,9 +767,7 @@ private fun NewRiskPointFormContent(
 
         Spacer(modifier = Modifier.height(18.dp))
 
-        // ------------------------------------------
-        // 2. DESCRIPCIÓN ESCRITA DE LA UBICACIÓN
-        // ------------------------------------------
+        // 2. Descripción corta escrita de la ubicación
         Text(
             text = "2. Descripción corta de la ubicación:",
             style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
@@ -758,11 +807,9 @@ private fun NewRiskPointFormContent(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // ------------------------------------------
-        // 3. HORA DEL DÍA (Mañana, Tarde, Noche)
-        // ------------------------------------------
+        // 3. Hora del día (Mañana, Tarde, Noche)
         Text(
-            text = "3. Hora del día (cuándo es más riesgoso pasar):",
+            text = "3. Hora del día (cuándo es riesgoso pasar):",
             style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
         )
         Spacer(modifier = Modifier.height(8.dp))
@@ -818,7 +865,6 @@ private fun NewRiskPointFormContent(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Botones de acción del formulario
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -851,7 +897,7 @@ private fun NewRiskPointFormContent(
 }
 
 /**
- * Diálogo modal para compartir un reporte por enlace o por texto.
+ * Diálogo modal para compartir reporte por WhatsApp, mensaje o enlace.
  */
 @Composable
 private fun SharePointDialog(
@@ -865,11 +911,7 @@ private fun SharePointDialog(
         onDismissRequest = onDismiss,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.Share,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
+                Icon(imageVector = Icons.Default.Share, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Compartir reporte", fontWeight = FontWeight.Bold)
             }
@@ -880,9 +922,7 @@ private fun SharePointDialog(
                     text = "Avisa a tus compañeros para que tomen precauciones o busquen otra calle:",
                     style = MaterialTheme.typography.bodyMedium
                 )
-
                 Spacer(modifier = Modifier.height(12.dp))
-
                 Card(
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
@@ -890,24 +930,13 @@ private fun SharePointDialog(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
-                        Text(
-                            text = "⚠️ ${point.category}",
-                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
-                        )
-                        Text(
-                            text = "📍 ${point.description}",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                        Text(
-                            text = "⏰ Horario: ${point.timeOfDay}",
-                            style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.primary)
-                        )
+                        Text(text = "⚠️ ${point.category}", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold))
+                        Text(text = "📍 ${point.description}", style = MaterialTheme.typography.bodySmall)
+                        Text(text = "⏰ Horario: ${point.timeOfDay}", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.primary))
                     }
                 }
-
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Opción 1: Menú compartir del celular
                 Button(
                     onClick = onShareViaSystem,
                     modifier = Modifier
@@ -922,7 +951,6 @@ private fun SharePointDialog(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Opción 2: Copiar texto completo
                 OutlinedButton(
                     onClick = onCopyText,
                     modifier = Modifier
@@ -937,7 +965,6 @@ private fun SharePointDialog(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Opción 3: Copiar enlace directo
                 OutlinedButton(
                     onClick = onCopyLink,
                     modifier = Modifier
@@ -953,20 +980,165 @@ private fun SharePointDialog(
         },
         confirmButton = {},
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cerrar")
-            }
+            TextButton(onClick = onDismiss) { Text("Cerrar") }
         }
     )
 }
 
 /**
- * Vista de estado vacío cuando no hay puntos registrados en el filtro seleccionado.
+ * Diálogo de gestión de almacenamiento local y respaldo a archivo .json.
+ */
+@Composable
+private fun StorageBackupDialog(
+    totalCount: Int,
+    jsonPreview: String,
+    onDismiss: () -> Unit,
+    onExportFile: () -> Unit,
+    onCopyJson: () -> Unit,
+    onResetSample: () -> Unit,
+    onPromptClearAll: () -> Unit
+) {
+    val scrollState = rememberScrollState()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Storage, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Almacenamiento Local", fontWeight = FontWeight.Bold)
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(scrollState)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        Text(
+                            text = "💾 Persistencia en tu teléfono",
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Tus datos quedan guardados en la base interna de Android ($totalCount reportes). No se pierden al cerrar la app.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Text(
+                    text = "Opciones de respaldo y archivo:",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Exportar archivo .json
+                Button(
+                    onClick = onExportFile,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(42.dp)
+                        .testTag("export_backup_file_button")
+                ) {
+                    Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Exportar a archivo .json")
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Copiar JSON
+                OutlinedButton(
+                    onClick = onCopyJson,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(42.dp)
+                ) {
+                    Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Copiar datos JSON")
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider()
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Cargar dato de ejemplo
+                OutlinedButton(
+                    onClick = onResetSample,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(42.dp)
+                ) {
+                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Cargar dato de ejemplo inicial")
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Borrar todo
+                OutlinedButton(
+                    onClick = onPromptClearAll,
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(42.dp)
+                ) {
+                    Icon(Icons.Default.DeleteSweep, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Borrar todos los reportes")
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text(
+                    text = "Vista previa del formato JSON:",
+                    style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = jsonPreview,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        modifier = Modifier.padding(8.dp),
+                        maxLines = 6
+                    )
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cerrar") }
+        }
+    )
+}
+
+/**
+ * Vista de estado vacío cuando no hay puntos registrados.
  */
 @Composable
 private fun EmptyStateCard(
     selectedFilter: FilterTime,
-    onOpenForm: () -> Unit
+    onOpenForm: () -> Unit,
+    onLoadSample: () -> Unit
 ) {
     Box(
         contentAlignment = Alignment.Center,
@@ -1009,34 +1181,33 @@ private fun EmptyStateCard(
 
             Text(
                 text = "Sé el primero en marcar un poste sin luz, perro suelto, zanja o tramo solitario para cuidar a tus compañeros.",
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                ),
+                style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant),
                 textAlign = TextAlign.Center
             )
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            Button(
-                onClick = onOpenForm,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                modifier = Modifier.testTag("empty_state_add_button")
-            ) {
-                Icon(Icons.Default.Add, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Marcar primer punto")
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(
+                    onClick = onOpenForm,
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                    modifier = Modifier.testTag("empty_state_add_button")
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Marcar punto")
+                }
+
+                OutlinedButton(onClick = onLoadSample) {
+                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Cargar ejemplo")
+                }
             }
         }
     }
 }
 
-/**
- * Función utilitaria para invocar el menú nativo de compartir de Android.
- * CUIDADO:
- * - FLAG_ACTIVITY_NEW_TASK es obligatorio cuando el context no proviene directamente de una Activity
- *   para evitar un crash tipo AndroidRuntimeException.
- * - Intent.createChooser proporciona el diálogo oficial del sistema operativo con las apps instaladas.
- */
 private fun shareReportViaIntent(context: Context, textToShare: String) {
     val sendIntent = Intent().apply {
         action = Intent.ACTION_SEND
@@ -1054,11 +1225,6 @@ private fun shareReportViaIntent(context: Context, textToShare: String) {
     }
 }
 
-/**
- * Función utilitaria para copiar texto o enlace al portapapeles de Android.
- * CUIDADO:
- * - Usar ClipData.newPlainText asegura compatibilidad con cualquier versión de Android desde SDK 24 a 36.
- */
 private fun copyToClipboard(context: Context, label: String, textToCopy: String) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     val clip = ClipData.newPlainText(label, textToCopy)

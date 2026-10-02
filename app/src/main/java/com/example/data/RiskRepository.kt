@@ -29,4 +29,19 @@ class RiskRepository(private val dao: RiskPointDao) {
     suspend fun countPoints(): Int {
         return dao.countPoints()
     }
+
+    suspend fun deleteAllPoints() {
+        dao.deleteAllPoints()
+    }
+
+    suspend fun seedDefaultIfEmpty() {
+        if (dao.countPoints() == 0) {
+            insertPoint(
+                category = "Poste sin luz",
+                description = "esquina de la tienda",
+                timeOfDay = "Noche",
+                exactTime = "20:30"
+            )
+        }
+    }
 }

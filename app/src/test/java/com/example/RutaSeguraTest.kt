@@ -23,9 +23,12 @@ import org.robolectric.annotation.Config
 
 /**
  * Pruebas unitarias y de integración para RUTA SEGURA.
- * Valida el criterio de aceptación principal:
- * "marco un punto con categoría 'poste sin luz', descripción 'esquina de la tienda'
- * y hora de la noche, y lo veo en la lista con su categoría y su hora".
+ * Valida:
+ * 1. Criterio de aceptación principal: marcar "Poste sin luz", "esquina de la tienda", "Noche".
+ * 2. Persistencia y lectura de datos locales sin perder información.
+ * 3. Filtrado por horario (Mañana, Tarde, Noche).
+ * 4. Compartir por texto y enlace.
+ * 5. Carga de dato de ejemplo, exportación JSON y borrado.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -37,7 +40,6 @@ class RutaSeguraTest {
     @Before
     fun setup() {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        // Usamos base de datos en memoria para pruebas rápidas y aisladas
         database = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
             .allowMainThreadQueries()
             .build()
@@ -51,7 +53,6 @@ class RutaSeguraTest {
 
     @Test
     fun `criterio de aceptacion - insertar punto poste sin luz de noche y verificar en lista`() = runTest {
-        // 1. Guardar punto con los datos exactos del criterio de aceptación
         val id = repository.insertPoint(
             category = "Poste sin luz",
             description = "esquina de la tienda",
@@ -60,7 +61,6 @@ class RutaSeguraTest {
         )
         assertTrue(id > 0)
 
-        // 2. Obtener lista desde el repositorio (Room Flow)
         val points = repository.allPoints.first()
         assertEquals(1, points.size)
 
@@ -95,7 +95,6 @@ class RutaSeguraTest {
 
     @Test
     fun `compartir reporte genera texto con datos completos`() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
         val app = ApplicationProvider.getApplicationContext<android.app.Application>()
         val viewModel = RutaViewModel(app, repository)
 
@@ -116,5 +115,35 @@ class RutaSeguraTest {
         val shareLink = viewModel.generateShareLink(point)
         assertTrue(shareLink.contains("https://rutasegura.app/punto"))
         assertTrue(shareLink.contains("id=42"))
+    }
+
+    @Test
+    fun `dato de ejemplo inicial precargado y borrado completo`() = runTest {
+        // Verificar que seedDefaultIfEmpty carga el dato de prueba
+        repository.seedDefaultIfEmpty()
+        var points = repository.allPoints.first()
+        assertEquals(1, points.size)
+        assertEquals("Poste sin luz", points.first().category)
+        assertEquals("esquina de la tienda", points.first().description)
+        assertEquals("Noche", points.first().timeOfDay)
+
+        // Verificar borrado
+        repository.deleteAllPoints()
+        points = repository.allPoints.first()
+        assertEquals(0, points.size)
+    }
+
+    @Test
+    fun `exportar a JSON genera contenido valido con campos`() = runTest {
+        val app = ApplicationProvider.getApplicationContext<android.app.Application>()
+        repository.insertPoint("Zanja", "frente al porton", "Tarde", "14:20")
+        val viewModel = RutaViewModel(app, repository)
+        val points = repository.allPoints.first()
+
+        val json = viewModel.exportToJson(points)
+        assertTrue(json.contains("categoria"))
+        assertTrue(json.contains("Zanja"))
+        assertTrue(json.contains("frente al porton"))
+        assertTrue(json.contains("Tarde"))
     }
 }

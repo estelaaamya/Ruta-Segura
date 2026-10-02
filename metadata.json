@@ -2,5 +2,7 @@
   "name": "Ruta Segura",
   "description": "App comunitaria para estudiantes que caminan al instituto: reporta y consulta puntos de riesgo en el camino filtrados por horario y compártelos con compañeros.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }
